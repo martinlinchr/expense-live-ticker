@@ -38,31 +38,44 @@ def main():
     st.set_page_config(layout="wide")
     st.title("Live Udgifts Ticker")
 
-    data = load_data()
+    if 'data' not in st.session_state:
+        st.session_state.data = load_data()
 
     # Sidebar for adding new categories and expenses
     with st.sidebar:
-        st.header("Tilføj Ny Kategori/Udgift")
+        st.header("Tilføj/Slet Kategori/Udgift")
         new_category = st.text_input("Ny kategori")
         if st.button("Tilføj Kategori") and new_category:
-            if new_category not in data['categories']:
-                data['categories'][new_category] = {}
-                save_data(data)
+            if new_category not in st.session_state.data['categories']:
+                st.session_state.data['categories'][new_category] = {}
+                save_data(st.session_state.data)
 
-        if data['categories']:
-            category = st.selectbox("Vælg kategori", list(data['categories'].keys()))
+        if st.session_state.data['categories']:
+            category = st.selectbox("Vælg kategori", list(st.session_state.data['categories'].keys()))
+            if st.button("Slet Kategori"):
+                del st.session_state.data['categories'][category]
+                save_data(st.session_state.data)
+                st.experimental_rerun()
+
             expense_name = st.text_input("Udgiftsnavn")
-            expense_amount = st.number_input("Månedligt beløb", min_value=0.0, format="%.2f")
+            expense_amount = st.number_input("Månedligt beløb", min_value=0, step=1)
             if st.button("Tilføj Udgift") and expense_name and expense_amount > 0:
-                data['categories'][category][expense_name] = {"amount": expense_amount}
-                save_data(data)
+                st.session_state.data['categories'][category][expense_name] = {"amount": expense_amount}
+                save_data(st.session_state.data)
+
+            if category in st.session_state.data['categories']:
+                expense_to_delete = st.selectbox("Vælg udgift at slette", list(st.session_state.data['categories'][category].keys()))
+                if st.button("Slet Udgift"):
+                    del st.session_state.data['categories'][category][expense_to_delete]
+                    save_data(st.session_state.data)
+                    st.experimental_rerun()
 
     # Main content
-    if data['categories']:
+    if st.session_state.data['categories']:
         # Decimal place settings
         st.sidebar.header("Indstillinger for Decimaler")
         decimal_settings = {}
-        for interval in ['Dag', 'Uge', 'Måned', 'År']:
+        for interval in ['Minut', 'Dag', 'Uge', 'Måned', 'År']:
             decimal_settings[interval] = st.sidebar.number_input(f"Decimaler for {interval}", 0, 10, 2)
 
         col1, col2 = st.columns(2)
@@ -76,22 +89,23 @@ def main():
             total_placeholder = st.empty()
 
         st.subheader("Udgifter per Kategori")
-        category_placeholders = {category: st.empty() for category in data['categories']}
+        category_placeholders = {category: st.empty() for category in st.session_state.data['categories']}
 
         while True:
             now = datetime.now()
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             seconds_passed = (now - start_of_month).total_seconds()
             
-            expenses_per_second = calculate_expenses_per_second(data, now)
+            expenses_per_second = calculate_expenses_per_second(st.session_state.data, now)
             
-            # Calculate monthly expenses
+            # Calculate expenses
             monthly_expenses = expenses_per_second * seconds_passed
             
             # Calculate total fixed expenses
             total_monthly = sum(sum(item['amount'] for item in category.values())
-                                for category in data['categories'].values())
+                                for category in st.session_state.data['categories'].values())
             total_expenses = {
+                'Minut': total_monthly / (30 * 24 * 60),
                 'Dag': total_monthly / 30,
                 'Uge': total_monthly / 4,
                 'Måned': total_monthly,
@@ -113,20 +127,22 @@ def main():
 
             # Update category tickers
             for category, placeholder in category_placeholders.items():
-                category_total = sum(item['amount'] for item in data['categories'][category].values())
-                category_per_second = category_total / (30 * 24 * 60 * 60)
-                
-                category_markdown = f"**{category}**\n\n"
-                category_monthly = category_per_second * seconds_passed
-                category_markdown += f"Denne måned: {format_currency(category_monthly, decimal_settings['Måned'])}\n\n"
-                
-                for expense, details in data['categories'][category].items():
-                    expense_monthly = details['amount']
-                    category_markdown += f"- {expense}: {format_currency(expense_monthly, decimal_settings['Måned'])} /måned\n\n"
-                
-                placeholder.markdown(category_markdown)
+                if category in st.session_state.data['categories']:
+                    category_total = sum(item['amount'] for item in st.session_state.data['categories'][category].values())
+                    category_per_second = category_total / (30 * 24 * 60 * 60)
+                    
+                    category_markdown = f"**{category}**\n\n"
+                    category_monthly = category_per_second * seconds_passed
+                    category_markdown += f"Denne måned: {format_currency(category_monthly, decimal_settings['Måned'])}\n\n"
+                    
+                    for expense, details in st.session_state.data['categories'][category].items():
+                        expense_monthly = details['amount']
+                        category_markdown += f"- {expense}: {format_currency(expense_monthly, decimal_settings['Måned'])} /måned\n\n"
+                    
+                    placeholder.markdown(category_markdown)
             
             time.sleep(1)
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
