@@ -1,7 +1,8 @@
 import streamlit as st
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
+import calendar
 
 # Load data
 def load_data():
@@ -16,11 +17,12 @@ def save_data(data):
     with open('expenses.json', 'w') as f:
         json.dump(data, f)
 
-# Calculate expenses per second
-def calculate_expenses_per_second(expenses):
+# Calculate expenses per second for the current month
+def calculate_expenses_per_second(expenses, current_date):
     total_monthly = sum(sum(item['amount'] for item in category.values())
                         for category in expenses['categories'].values())
-    return total_monthly / (30 * 24 * 60 * 60)  # Assuming 30 days per month
+    days_in_month = calendar.monthrange(current_date.year, current_date.month)[1]
+    return total_monthly / (days_in_month * 24 * 60 * 60)
 
 # Format currency with adjustable decimal places
 def format_currency(amount, decimal_places):
@@ -57,8 +59,6 @@ def main():
 
     # Main content
     if data['categories']:
-        expenses_per_second = calculate_expenses_per_second(data)
-
         # Decimal place settings
         st.sidebar.header("Indstillinger for Decimaler")
         decimal_settings = {}
@@ -68,32 +68,47 @@ def main():
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("Samlet Udgiftsoversigt")
-            total_placeholder = st.empty()
+            st.subheader("Månedens Udgifter")
+            monthly_placeholder = st.empty()
 
         with col2:
-            st.subheader("Udgifter per Kategori")
-            category_placeholders = {category: st.empty() for category in data['categories']}
+            st.subheader("Samlede Faste Udgifter")
+            total_placeholder = st.empty()
+
+        st.subheader("Udgifter per Kategori")
+        category_placeholders = {category: st.empty() for category in data['categories']}
 
         while True:
             now = datetime.now()
-            seconds_passed = now.second + now.minute * 60 + now.hour * 3600
+            start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            seconds_passed = (now - start_of_month).total_seconds()
             
-            expenses = {
-                'Sekund': expenses_per_second,
-                'Minut': expenses_per_second * 60,
-                'Time': expenses_per_second * 3600,
-                'Dag': expenses_per_second * 86400,
-                'Måned': expenses_per_second * 2592000,  # 30 days
-                'År': expenses_per_second * 31536000  # 365 days
+            expenses_per_second = calculate_expenses_per_second(data, now)
+            
+            # Calculate monthly expenses
+            monthly_expenses = expenses_per_second * seconds_passed
+            
+            # Calculate total fixed expenses
+            total_monthly = sum(sum(item['amount'] for item in category.values())
+                                for category in data['categories'].values())
+            total_expenses = {
+                'Dag': total_monthly / 30,
+                'Uge': total_monthly / 4,
+                'Måned': total_monthly,
+                'År': total_monthly * 12
             }
             
             current_time = format_datetime(now)
             
-            total_markdown = f"**Opdateret: {current_time}**\n\n"
-            for interval, amount in expenses.items():
-                total_markdown += f"**{interval}:** {format_currency(amount, decimal_settings[interval])}\n\n"
+            # Update monthly ticker
+            monthly_markdown = f"**Opdateret: {current_time}**\n\n"
+            monthly_markdown += f"**Månedens udgifter: {format_currency(monthly_expenses, decimal_settings['Måned'])}**\n\n"
+            monthly_placeholder.markdown(monthly_markdown)
             
+            # Update total fixed expenses
+            total_markdown = f"**Faste udgifter:**\n\n"
+            for interval, amount in total_expenses.items():
+                total_markdown += f"**{interval}:** {format_currency(amount, decimal_settings[interval])}\n\n"
             total_placeholder.markdown(total_markdown)
 
             # Update category tickers
@@ -102,14 +117,12 @@ def main():
                 category_per_second = category_total / (30 * 24 * 60 * 60)
                 
                 category_markdown = f"**{category}**\n\n"
-                for interval, amount in expenses.items():
-                    category_amount = amount * (category_per_second / expenses_per_second)
-                    category_markdown += f"{interval}: {format_currency(category_amount, decimal_settings[interval])}\n\n"
+                category_monthly = category_per_second * seconds_passed
+                category_markdown += f"Denne måned: {format_currency(category_monthly, decimal_settings['Måned'])}\n\n"
                 
                 for expense, details in data['categories'][category].items():
-                    expense_per_second = details['amount'] / (30 * 24 * 60 * 60)
-                    expense_amount = expenses['Måned'] * (expense_per_second / expenses_per_second)
-                    category_markdown += f"- {expense}: {format_currency(expense_amount, decimal_settings['Måned'])} /måned\n\n"
+                    expense_monthly = details['amount']
+                    category_markdown += f"- {expense}: {format_currency(expense_monthly, decimal_settings['Måned'])} /måned\n\n"
                 
                 placeholder.markdown(category_markdown)
             
