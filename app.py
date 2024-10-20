@@ -72,16 +72,24 @@ def main():
 
     # Decimal place settings
     st.sidebar.header("Indstillinger for Decimaler")
-    decimal_settings = {}
-    for interval in ['Minut', 'Dag', 'Uge', 'Måned', 'År']:
-        decimal_settings[interval] = st.sidebar.number_input(f"Decimaler for {interval}", 0, 10, 2)
+    decimal_settings = {
+        'Minut': st.sidebar.number_input("Decimaler for Minut", 0, 10, 6),
+        'Dag': st.sidebar.number_input("Decimaler for Dag", 0, 10, 0),
+        'Uge': st.sidebar.number_input("Decimaler for Uge", 0, 10, 0),
+        'Måned': st.sidebar.number_input("Decimaler for Måned", 0, 10, 0),
+        'År': st.sidebar.number_input("Decimaler for År", 0, 10, 0)
+    }
 
     # Main content
     if st.session_state.data['categories']:
+        # Visible counter at the top
+        st.header("Månedens Udgifter")
+        top_counter = st.empty()
+
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("Månedens Udgifter")
+            st.subheader("Detaljerede Månedsudgifter")
             monthly_placeholder = st.empty()
 
         with col2:
@@ -89,7 +97,7 @@ def main():
             total_placeholder = st.empty()
 
         st.subheader("Udgifter per Kategori")
-        category_container = st.container()
+        category_placeholders = {category: st.empty() for category in st.session_state.data['categories']}
 
         # Live update loop
         while True:
@@ -115,9 +123,13 @@ def main():
             
             current_time = format_datetime(now)
             
+            # Update top counter
+            top_counter.markdown(f"## {format_currency(monthly_expenses, 2)}")
+
             # Update monthly ticker
             monthly_markdown = f"**Opdateret: {current_time}**\n\n"
-            monthly_markdown += f"**Månedens udgifter: {format_currency(monthly_expenses, decimal_settings['Måned'])}**\n\n"
+            for interval, amount in total_expenses.items():
+                monthly_markdown += f"**{interval}:** {format_currency(amount * (seconds_passed / (30 * 24 * 60 * 60)), decimal_settings[interval])}\n\n"
             monthly_placeholder.markdown(monthly_markdown)
             
             # Update total fixed expenses
@@ -127,23 +139,21 @@ def main():
             total_placeholder.markdown(total_markdown)
 
             # Update category tickers
-            with category_container:
-                for category in st.session_state.data['categories']:
-                    st.subheader(category)
-                    category_total = sum(item['amount'] for item in st.session_state.data['categories'][category].values())
-                    category_per_second = category_total / (30 * 24 * 60 * 60)
-                    
-                    category_monthly = category_per_second * seconds_passed
-                    st.write(f"Denne måned: {format_currency(category_monthly, decimal_settings['Måned'])}")
-                    
-                    for expense, details in st.session_state.data['categories'][category].items():
-                        expense_monthly = details['amount']
-                        st.write(f"- {expense}: {format_currency(expense_monthly, decimal_settings['Måned'])} /måned")
-                    
-                    st.write("---")
-
+            for category, placeholder in category_placeholders.items():
+                category_total = sum(item['amount'] for item in st.session_state.data['categories'][category].values())
+                category_per_second = category_total / (30 * 24 * 60 * 60)
+                
+                category_markdown = f"**{category}**\n\n"
+                category_monthly = category_per_second * seconds_passed
+                category_markdown += f"Denne måned: {format_currency(category_monthly, decimal_settings['Måned'])}\n\n"
+                
+                for expense, details in st.session_state.data['categories'][category].items():
+                    expense_monthly = details['amount']
+                    category_markdown += f"- {expense}: {format_currency(expense_monthly, decimal_settings['Måned'])} /måned\n\n"
+                
+                placeholder.markdown(category_markdown)
+            
             time.sleep(1)
-            st.empty()  # This triggers a rerun without using experimental_rerun
 
 if __name__ == "__main__":
     main()
