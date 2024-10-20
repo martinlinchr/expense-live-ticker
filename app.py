@@ -22,9 +22,9 @@ def calculate_expenses_per_second(expenses):
                         for category in expenses['categories'].values())
     return total_monthly / (30 * 24 * 60 * 60)  # Assuming 30 days per month
 
-# Format currency
+# Format currency without decimal places
 def format_currency(amount):
-    return f"{amount:,.2f} kr.".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{int(amount):,} kr.".replace(",", ".")
 
 # Format datetime
 def format_datetime(dt):
@@ -48,7 +48,7 @@ def main():
     if data['categories']:
         category = st.selectbox("Vælg kategori", list(data['categories'].keys()))
         expense_name = st.text_input("Udgiftsnavn")
-        expense_amount = st.number_input("Månedligt beløb", min_value=0.0, format="%.2f")
+        expense_amount = st.number_input("Månedligt beløb", min_value=0, step=1)
         if st.button("Tilføj Udgift") and expense_name and expense_amount > 0:
             data['categories'][category][expense_name] = {"amount": expense_amount}
             save_data(data)
@@ -62,6 +62,10 @@ def main():
         while True:
             now = datetime.now()
             seconds_passed = now.second + now.minute * 60 + now.hour * 3600
+            
+            expenses_second = expenses_per_second
+            expenses_minute = expenses_per_second * 60
+            expenses_hour = expenses_per_second * 3600
             daily_expenses = expenses_per_second * seconds_passed
             monthly_expenses = expenses_per_second * seconds_passed * 30
             yearly_expenses = expenses_per_second * seconds_passed * 365
@@ -70,6 +74,9 @@ def main():
             
             placeholder.markdown(f"""
             ## Aktuelle Udgifter (pr. {current_time})
+            - Pr. Sekund: {format_currency(expenses_second)}
+            - Pr. Minut: {format_currency(expenses_minute)}
+            - Pr. Time: {format_currency(expenses_hour)}
             - Pr. Dag: {format_currency(daily_expenses)}
             - Pr. Måned: {format_currency(monthly_expenses)}
             - Pr. År: {format_currency(yearly_expenses)}
