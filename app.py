@@ -2,10 +2,6 @@ import streamlit as st
 import json
 from datetime import datetime
 import time
-import locale
-
-# Sæt locale til dansk
-locale.setlocale(locale.LC_ALL, 'da_DK.UTF-8')
 
 # Load data
 def load_data():
@@ -26,9 +22,11 @@ def calculate_expenses_per_second(expenses):
                         for category in expenses['categories'].values())
     return total_monthly / (30 * 24 * 60 * 60)  # Assuming 30 days per month
 
+# Format currency
 def format_currency(amount):
     return f"{amount:,.2f} kr.".replace(",", "X").replace(".", ",").replace("X", ".")
 
+# Format datetime
 def format_datetime(dt):
     months = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"]
     return f"{dt.day}. {months[dt.month-1]} {dt.year} {dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
@@ -68,7 +66,7 @@ def main():
             monthly_expenses = expenses_per_second * seconds_passed * 30
             yearly_expenses = expenses_per_second * seconds_passed * 365
             
-            current_time = now.strftime("%d. %B %Y %H:%M:%S")
+            current_time = format_datetime(now)
             
             placeholder.markdown(f"""
             ## Aktuelle Udgifter (pr. {current_time})
