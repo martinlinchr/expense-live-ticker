@@ -26,9 +26,12 @@ def calculate_expenses_per_second(expenses):
                         for category in expenses['categories'].values())
     return total_monthly / (30 * 24 * 60 * 60)  # Assuming 30 days per month
 
-# Format currency
 def format_currency(amount):
-    return locale.currency(amount, grouping=True)
+    return f"{amount:,.2f} kr.".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def format_datetime(dt):
+    months = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"]
+    return f"{dt.day}. {months[dt.month-1]} {dt.year} {dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
 
 # Main app
 def main():
