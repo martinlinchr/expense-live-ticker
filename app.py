@@ -62,7 +62,7 @@ def main():
         # Decimal place settings
         st.sidebar.header("Indstillinger for Decimaler")
         decimal_settings = {}
-        for interval in ['Sekund', 'Minut', 'Time', 'Dag', 'Måned', 'År']:
+        for interval in ['Dag', 'Uge', 'Måned', 'År']:
             decimal_settings[interval] = st.sidebar.number_input(f"Decimaler for {interval}", 0, 10, 2)
 
         col1, col2 = st.columns(2)
