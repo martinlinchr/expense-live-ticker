@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 import time
 import calendar
 
@@ -55,7 +55,7 @@ def main():
             if st.button("Slet Kategori"):
                 del st.session_state.data['categories'][category]
                 save_data(st.session_state.data)
-                st.experimental_rerun()
+                st.rerun()
 
             expense_name = st.text_input("Udgiftsnavn")
             expense_amount = st.number_input("Månedligt beløb", min_value=0, step=1)
@@ -68,16 +68,16 @@ def main():
                 if st.button("Slet Udgift"):
                     del st.session_state.data['categories'][category][expense_to_delete]
                     save_data(st.session_state.data)
-                    st.experimental_rerun()
+                    st.rerun()
+
+    # Decimal place settings
+    st.sidebar.header("Indstillinger for Decimaler")
+    decimal_settings = {}
+    for interval in ['Minut', 'Dag', 'Uge', 'Måned', 'År']:
+        decimal_settings[interval] = st.sidebar.number_input(f"Decimaler for {interval}", 0, 10, 2)
 
     # Main content
     if st.session_state.data['categories']:
-        # Decimal place settings
-        st.sidebar.header("Indstillinger for Decimaler")
-        decimal_settings = {}
-        for interval in ['Minut', 'Dag', 'Uge', 'Måned', 'År']:
-            decimal_settings[interval] = st.sidebar.number_input(f"Decimaler for {interval}", 0, 10, 2)
-
         col1, col2 = st.columns(2)
 
         with col1:
@@ -89,8 +89,9 @@ def main():
             total_placeholder = st.empty()
 
         st.subheader("Udgifter per Kategori")
-        category_placeholders = {category: st.empty() for category in st.session_state.data['categories']}
+        category_container = st.container()
 
+        # Live update loop
         while True:
             now = datetime.now()
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -126,23 +127,23 @@ def main():
             total_placeholder.markdown(total_markdown)
 
             # Update category tickers
-            for category, placeholder in category_placeholders.items():
-                if category in st.session_state.data['categories']:
+            with category_container:
+                for category in st.session_state.data['categories']:
+                    st.subheader(category)
                     category_total = sum(item['amount'] for item in st.session_state.data['categories'][category].values())
                     category_per_second = category_total / (30 * 24 * 60 * 60)
                     
-                    category_markdown = f"**{category}**\n\n"
                     category_monthly = category_per_second * seconds_passed
-                    category_markdown += f"Denne måned: {format_currency(category_monthly, decimal_settings['Måned'])}\n\n"
+                    st.write(f"Denne måned: {format_currency(category_monthly, decimal_settings['Måned'])}")
                     
                     for expense, details in st.session_state.data['categories'][category].items():
                         expense_monthly = details['amount']
-                        category_markdown += f"- {expense}: {format_currency(expense_monthly, decimal_settings['Måned'])} /måned\n\n"
+                        st.write(f"- {expense}: {format_currency(expense_monthly, decimal_settings['Måned'])} /måned")
                     
-                    placeholder.markdown(category_markdown)
-            
+                    st.write("---")
+
             time.sleep(1)
-            st.experimental_rerun()
+            st.empty()  # This triggers a rerun without using experimental_rerun
 
 if __name__ == "__main__":
     main()
