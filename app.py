@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import calendar
 
@@ -40,6 +40,8 @@ def main():
 
     if 'data' not in st.session_state:
         st.session_state.data = load_data()
+    if 'last_update' not in st.session_state:
+        st.session_state.last_update = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     # Sidebar for adding new categories and expenses
     with st.sidebar:
@@ -73,6 +75,7 @@ def main():
     # Decimal place settings
     st.sidebar.header("Indstillinger for Decimaler")
     decimal_settings = {
+        'Top': st.sidebar.number_input("Decimaler for Top Tæller", 0, 10, 4),
         'Minut': st.sidebar.number_input("Decimaler for Minut", 0, 10, 6),
         'Dag': st.sidebar.number_input("Decimaler for Dag", 0, 10, 0),
         'Uge': st.sidebar.number_input("Decimaler for Uge", 0, 10, 0),
@@ -102,8 +105,12 @@ def main():
         # Live update loop
         while True:
             now = datetime.now()
-            start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            seconds_passed = (now - start_of_month).total_seconds()
+            
+            # Check if we need to reset for a new month
+            if now.month != st.session_state.last_update.month:
+                st.session_state.last_update = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            seconds_passed = (now - st.session_state.last_update).total_seconds()
             
             expenses_per_second = calculate_expenses_per_second(st.session_state.data, now)
             
@@ -124,12 +131,13 @@ def main():
             current_time = format_datetime(now)
             
             # Update top counter
-            top_counter.markdown(f"## {format_currency(monthly_expenses, 2)}")
+            top_counter.markdown(f"## {format_currency(monthly_expenses, decimal_settings['Top'])}")
 
             # Update monthly ticker
             monthly_markdown = f"**Opdateret: {current_time}**\n\n"
             for interval, amount in total_expenses.items():
-                monthly_markdown += f"**{interval}:** {format_currency(amount * (seconds_passed / (30 * 24 * 60 * 60)), decimal_settings[interval])}\n\n"
+                current_amount = amount * (seconds_passed / (30 * 24 * 60 * 60))
+                monthly_markdown += f"**{interval}:** {format_currency(current_amount, decimal_settings[interval])}\n\n"
             monthly_placeholder.markdown(monthly_markdown)
             
             # Update total fixed expenses
